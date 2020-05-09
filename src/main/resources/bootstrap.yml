@@ -1,0 +1,5 @@
+micronaut:
+  application:
+    name: k8s-terraform-controller
+  config-client:
+    enabled: true

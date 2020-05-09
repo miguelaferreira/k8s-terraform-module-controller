@@ -1,0 +1,5 @@
+profile: service
+defaultPackage: k8s.terraform.controller
+---
+testFramework: junit
+sourceLanguage: java

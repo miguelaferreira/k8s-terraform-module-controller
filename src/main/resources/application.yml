@@ -1,0 +1,3 @@
+micronaut:
+  application:
+    name: k8s-terraform-controller

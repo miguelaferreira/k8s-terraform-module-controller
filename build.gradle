@@ -1,0 +1,90 @@
+plugins {
+    id "com.google.cloud.tools.jib" version '2.2.0'
+    id "com.github.johnrengelman.shadow" version "5.2.0"
+    id "application"
+    id "net.ltgt.apt-eclipse" version "0.21"
+}
+
+version "0.1"
+group "k8s.terraform.controller"
+
+repositories {
+    mavenCentral()
+    maven { url "https://jcenter.bintray.com" }
+    maven { url "https://jitpack.io" }
+}
+
+configurations {
+    // for dependencies that are needed for development only
+    developmentOnly
+}
+
+dependencies {
+    compileOnly 'org.projectlombok:lombok:1.18.12'
+    annotationProcessor 'org.projectlombok:lombok:1.18.12'
+
+    testCompileOnly 'org.projectlombok:lombok:1.18.12'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.12'
+
+    annotationProcessor platform("io.micronaut:micronaut-bom:$micronautVersion")
+    annotationProcessor "io.micronaut:micronaut-inject-java"
+    annotationProcessor "io.micronaut:micronaut-validation"
+    implementation platform("io.micronaut:micronaut-bom:$micronautVersion")
+    implementation "io.micronaut:micronaut-management"
+    implementation "io.micronaut:micronaut-http-client"
+    implementation "io.micronaut:micronaut-inject"
+    implementation "io.micronaut:micronaut-validation"
+    implementation "io.micronaut:micronaut-runtime"
+
+//    implementation "io.micronaut.kubernetes:micronaut-kubernetes-discovery-client"
+    implementation 'com.github.miguelaferreira:micronaut-kubernetes:extend-k8s-operations-SNAPSHOT'
+//    implementation files('/Users/miguel/dev/git/github.com/miguelaferreira/micronaut-kubernetes/kubernetes-discovery-client/build/libs/kubernetes-discovery-client-1.0.5.BUILD-SNAPSHOT.jar')
+
+    implementation "io.micronaut:micronaut-http-server-netty"
+    implementation "javax.annotation:javax.annotation-api"
+    runtimeOnly "ch.qos.logback:logback-classic:1.2.3"
+    testAnnotationProcessor platform("io.micronaut:micronaut-bom:$micronautVersion")
+    testAnnotationProcessor "io.micronaut:micronaut-inject-java"
+    testImplementation platform("io.micronaut:micronaut-bom:$micronautVersion")
+    testImplementation "org.junit.jupiter:junit-jupiter-api"
+    testImplementation "io.micronaut.test:micronaut-test-junit5"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine"
+
+
+    testImplementation group: 'org.hamcrest', name: 'java-hamcrest', version: '2.0.0.0'
+
+    implementation 'io.vavr:vavr:0.10.2'
+}
+
+test.classpath += configurations.developmentOnly
+
+mainClassName = "com.github.miguelaferreira.terraformcontroller.Application"
+// use JUnit 5 platform
+test {
+    useJUnitPlatform()
+}
+jib {
+    from {
+        image = 'gcr.io/distroless/java:11'
+    }
+    to {
+        image = 'docker.pkg.github.com/miguelaferreira/k8s-terraform-controller/java11'
+        credHelper = 'osxkeychain'
+    }
+}
+
+shadowJar {
+    mergeServiceFiles()
+}
+
+tasks.withType(JavaExec) {
+    classpath += configurations.developmentOnly
+    jvmArgs('-noverify', '-XX:TieredStopAtLevel=1', '-Dcom.sun.management.jmxremote')
+}
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+    options.compilerArgs.add('-parameters')
+}
+
+compileJava.options.fork = true
+compileJava.options.forkOptions.executable = '/Users/miguel/.sdkman/candidates/java/current/bin/javac'
