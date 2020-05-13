@@ -63,7 +63,8 @@ class ExecutionPodModel implements Execution {
                              .build();
     }
 
-    private static ContainerModel buildRunnerContainer(final String name, final String backendCredentialsSecretName, final String variablesSecretName, final TF_COMMAND tfCommand) {
+    private static ContainerModel buildRunnerContainer(final String name, final String backendCredentialsSecretName,
+                                                       final String variablesSecretName, final TF_COMMAND tfCommand) {
         final Stream<String> runnerCommands = Stream.concat(getTerraformInitCommands(name), getTerraformCommands(name, tfCommand));
         final List<String> runnerCommand = Arrays.asList("bash", "-vc", runnerCommands.collect(Collectors.joining(" && ")));
 

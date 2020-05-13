@@ -13,7 +13,7 @@ metadata:
   name: default-service-discoverer
 subjects:
   - kind: ServiceAccount
-    name: default
+    name: release-k8s-terraform-module-controller
 roleRef:
   kind: Role
   name: service-discoverer

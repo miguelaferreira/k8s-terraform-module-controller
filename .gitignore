@@ -27,3 +27,4 @@ out/
 src/main/resources/application-local.yml
 **/*.tfstate*
 **/.terraform/
+.gradletasknamecache

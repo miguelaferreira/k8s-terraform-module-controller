@@ -8,6 +8,7 @@ metadata:
   name: {{ include "k8s-terraform-module-controller.fullname" . }}
   labels:
     {{- include "k8s-terraform-module-controller.labels" . | nindent 4 }}
+    tf.module/config: controller
 spec:
   replicas: 1
   selector:

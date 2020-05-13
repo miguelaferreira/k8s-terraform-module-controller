@@ -59,12 +59,11 @@ Create the name of the service account to use
 */}}
 {{- define "k8s-terraform-module-controller.serviceAccountName" -}}
 {{- if .Values.rbac.serviceAccount.create -}}
-    {{ include "k8s-terraform-module-controller.fullname" . }}
+{{ include "k8s-terraform-module-controller.fullname" . }}
 {{- else -}}
 "default"
 {{- end -}}
 {{- end -}}
-
 
 {{/*
 Create the name of the application configuration configmap

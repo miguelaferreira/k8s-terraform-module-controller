@@ -10,14 +10,18 @@ import lombok.Data;
 @ConfigurationProperties("controller")
 public class ControllerConfig {
 
+    public static final String TF_MODULE_INPUT_LABEL = "tf.module/input";
+    public static final String DEFAULT_SERVICE_ACCOUNT = "default";
+
     private String inputLabelSelector;
     private List<String> containerRegistryCredSecrets;
 
     public String getInputLabelSelector() {
-        return Objects.requireNonNullElse(inputLabelSelector, "tf.module/input");
+        return Objects.requireNonNullElse(inputLabelSelector, TF_MODULE_INPUT_LABEL);
     }
 
     public List<String> getContainerRegistryCredSecrets() {
         return Objects.requireNonNullElse(containerRegistryCredSecrets, List.of());
     }
+
 }

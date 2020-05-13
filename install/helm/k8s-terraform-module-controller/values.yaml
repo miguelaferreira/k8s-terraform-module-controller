@@ -14,7 +14,6 @@ controller:
       # Credentials secret name
       sceretName: "terraform-backend-credentials"
 
-
 image:
   repository: docker.pkg.github.com/miguelaferreira/k8s-terraform-module-controller/controller-java11
   pullPolicy: Always

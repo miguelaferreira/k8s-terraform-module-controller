@@ -7,8 +7,8 @@ apiVersion: v1
 metadata:
   name: {{ include "k8s-terraform-module-controller.appliction.configmapName" . }}
   labels:
-    tf.module/config: controller
     {{- include "k8s-terraform-module-controller.labels" . | nindent 4 }}
+    tf.module/config: controller
 data:
   application.properties: |
     controller.input_label_selector=tf.module/input
