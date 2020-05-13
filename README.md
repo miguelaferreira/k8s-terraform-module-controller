@@ -11,9 +11,42 @@ The required resources are:
 If the execution of the pod succeeds then a new secret is created with the outputs produced by terraform.
 That secret can be bound to other kubernetes objects to make the outputs available to them.
 
+## Motivation
+
+I have spent a significant amount of time writing software that builds and maintains cloud based  systems that cater for both the operation of software in production environments and the continuous development of the software itself (including the software the bootstraps the whole thing).
+During this time I've experienced a continuous struggle between keeping control of the most fundamental aspects of the systems we build and run, while giving ourselves and other developers (at very different levels of the cloud application stack) the ability to self-service.
+Traditionally one builds some infrastructure on a cloud platform (for example AWS), then part of that infrastructure is made available for teams that develop on (or against) it, and the other part is made available to teams that actually operate software on it to deliver value to someone.
+
+When the teams developing software on the infrastructure need some new resource (say a new type of DB, or message broker) they topically ask someone to provide that, or otherwise there must be some self-servicing process in place for the teams to do that themselves.
+Offering self-service to teams could be as easy as providing access to the underlying cloud platform.
+For many teams that is probably a good option, but when it is not and there is a kubernetes cluster already in place, another option is to provide teams with a [kubernetes service catalog](https://kubernetes.io/docs/concepts/extend-kubernetes/service-catalog/) that allows them to provision new infrastructure in a kubernetes native way.
+The service catalog will then delegate infrastructure provisioning requests to the service brokers that are able to handle them.
+Which means that, using the AWS example, there needs to be a [AWS Service Broker](https://github.com/awslabs/aws-servicebroker) configured with the service catalog in order to make that work.
+Considering other platforms, say GCP or Azure, specific service brokers are needed for those too if they are to be used.
+
+While having used both service catalog and AWS Service Broker I came to appreciate how terraform is much much better at abstracting the underlying APIs for me.
+I mean, I've been building entire systems from 0 to 100% and maintaining a steady evolution with terraform for more than a few years.
+How hard would it be to use terraform to provision discrete pieces of infrastructure for specific purposes in a kubernetes native way?
+
+That ☝️, right there, was my motivation!
+That and the fact that after years of dealing with this issue in many different ways, there is still no clear way of doing this, of abstracting the provisioning of whatever cloud/application/service/resource in a kubernetes native way with the ease and resilience terraform provides.
+I think I know most of the quirks and limitations of terraform, and there's lots, some of them are there sine day 1 (like how modules are not a first-class graph node!!).
+Still terraform is a pretty powerful set of tools, has an amazing community of regular people that are into automation and open-source, so I think it deserves a shot at this space.
+
+And of course, I picked all the shinny things I like, to build this controller with.
+Standing on the shoulders of these giants, makes it a lot easier:
+- java
+- micronaut
+- gradle
+- docker
+- kubernetes
+- terraform
+- aws
+- ... and more
+
 ## How to use
 
-With an installed and configured controller, in order to provision a terraform module a user creates a secret.
+With an [installed and configured controller](#how-to-install), in order to provision a terraform module a user creates a secret.
 ```bash
 kubectl -n terraform-controller create secret generic terraform-module-example-1 \
     --from-literal=name='my first terraform module via kubernetes' \
