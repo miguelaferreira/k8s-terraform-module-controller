@@ -39,7 +39,7 @@ public class SecretInputSource implements InputSource {
                                 .image(data.get(KEY_IMAGE))
                                 .tag(data.get(KEY_TAG))
                                 .path(data.get(KEY_PATH))
-                                // for// @formatter:off
+                                // @formatter:off
                                 .variables(mapper.readValue(data.get(KEY_VARIABLES), new TypeReference<>() {}))
                                 // @formatter:on
                                 .build();

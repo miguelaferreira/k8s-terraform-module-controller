@@ -1,5 +1,7 @@
 package com.github.miguelaferreira.terraformcontroller;
 
+import static com.github.miguelaferreira.terraformcontroller.utils.RxUtils.RETRY_UNLESS_EXISTS;
+
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.ArrayList;
@@ -8,9 +10,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.github.miguelaferreira.terraformcontroller.domain.Execution;
 import com.github.miguelaferreira.terraformcontroller.domain.KubernetesPodFactory;
+import com.github.miguelaferreira.terraformcontroller.utils.RxUtils;
 import io.micronaut.kubernetes.client.v1.KubernetesClient;
+import io.micronaut.kubernetes.client.v1.KubernetesConfiguration;
 import io.micronaut.kubernetes.client.v1.pods.Pod;
-import io.reactivex.Flowable;
+import io.reactivex.Single;
 import lombok.Builder;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
@@ -28,18 +32,21 @@ public class ExecutionService {
     private final KubernetesClient k8sClient;
 
     @Inject
-    public ExecutionService(final String namespace, final KubernetesClient k8sClient) {
-        this.namespace = namespace;
+    public ExecutionService(final KubernetesConfiguration k8sConfig, final KubernetesClient k8sClient) {
+        this.namespace = k8sConfig.getNamespace();
         this.k8sClient = k8sClient;
     }
 
-    public Pod executeInput(final Execution executionPodModel) {
-        final Pod pod = KubernetesPodFactory.build(executionPodModel);
+    public Single<Pod> createExecutionPod(final Execution.TF_COMMAND tfCommand, final Execution executionPodModel) {
+        final Pod pod = KubernetesPodFactory.build(executionPodModel, tfCommand);
 
-        final String name = executionPodModel.getName();
-        final Pod createdPod = Flowable.fromPublisher(this.k8sClient.createPod(namespace, pod)).blockingFirst();
-        final String phase = createdPod.getStatus().getPhase();
-        log.info("Pod for input {} created, pod status phase is {}", name, phase);
+        return RxUtils.oneShot(this.k8sClient.createPod(namespace, pod), RETRY_UNLESS_EXISTS)
+                      .map(p -> updatePodExecutionStatus(p, executionPodModel.getName()));
+    }
+
+    public Pod updatePodExecutionStatus(final Pod pod, final String name) {
+        final String phase = pod.getStatus().getPhase();
+        log.info("Pod for input {} created, pod status phase is {}: {}", name, phase, pod.getMetadata().getName());
 
         if (!executionStatus.containsKey(name)) {
             executionStatus.put(name, ExecutionInfo.builder().name(name).build());

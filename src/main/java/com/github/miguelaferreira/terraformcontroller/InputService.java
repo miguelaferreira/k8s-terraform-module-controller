@@ -1,20 +1,27 @@
 package com.github.miguelaferreira.terraformcontroller;
 
+import static com.github.miguelaferreira.terraformcontroller.domain.KubernetesOperationsService.ensureConfigMapExists;
+import static com.github.miguelaferreira.terraformcontroller.domain.KubernetesOperationsService.ensureSecretExists;
+
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.miguelaferreira.terraformcontroller.domain.Execution;
 import com.github.miguelaferreira.terraformcontroller.domain.Input;
-import com.github.miguelaferreira.terraformcontroller.domain.KubernetesOperationsService;
 import com.github.miguelaferreira.terraformcontroller.domain.Variable;
 import com.github.miguelaferreira.terraformcontroller.domain.VariableMap;
 import io.micronaut.kubernetes.client.v1.KubernetesClient;
+import io.micronaut.kubernetes.client.v1.KubernetesConfiguration;
 import io.micronaut.kubernetes.client.v1.configmaps.ConfigMap;
 import io.micronaut.kubernetes.client.v1.secrets.Secret;
-import io.vavr.control.Either;
+import io.reactivex.Single;
+import io.reactivex.schedulers.Schedulers;
 import lombok.extern.slf4j.Slf4j;
 
 /*
@@ -38,40 +45,50 @@ public class InputService {
 
     public static final String TAG_SEEN = "seen";
     public static final String TAG_DESTROYED = "destroyed";
-    public static final String TAG_CONFIG_FAILED = "config-failed";
     private final String namespace;
     private final KubernetesClient k8sClient;
+    private final ExecutorService executorService;
     private final ObjectMapper mapper;
+
     private final ConcurrentHashMap<String, String> inputLedger = new ConcurrentHashMap<>();
 
-    public InputService(final String namespace, final KubernetesClient k8sClient, final ObjectMapper mapper) {
-        this.namespace = namespace;
+    public InputService(final KubernetesConfiguration k8sConfig, final KubernetesClient k8sClient, @Named("io") final ExecutorService executorService, final ObjectMapper mapper) {
+        this.namespace = k8sConfig.getNamespace();
         this.k8sClient = k8sClient;
+        this.executorService = executorService;
         this.mapper = mapper;
     }
 
-    // Called on the reconciliation of each input
-    public void configureInput(final String name, final Input model) throws JsonProcessingException {
-        String tag = TAG_SEEN;
-        final Either<Throwable, ConfigMap> maybeConfigMap =
-                KubernetesOperationsService.ensureConfigMapExists(k8sClient, namespace, getModuleConfigMapName(name), serializeObject(model.getModule()));
-        if (maybeConfigMap.isLeft()) {
-            final Throwable cause = maybeConfigMap.getLeft();
-            final String msg = String.format("Failed to ensure %s input module configmap exists", name);
-            log.error(msg + ": {}", cause.getMessage());
-            log.error(msg, cause);
-            tag = TAG_CONFIG_FAILED;
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    public void configureInput(final String name, final Input model) {
+        log.debug("Configuring input {}: {}", name, model);
+
+        final Map<String, String> serialisedModuleObject;
+        try {
+            serialisedModuleObject = serializeObject(model.getModule());
+        } catch (final JsonProcessingException e) {
+            log.error("Failed to serialize module object to save in config map: {}", e.getMessage());
+            log.debug("Failed to serialize module object to save in config map", e);
+            return;
         }
-        final Either<Throwable, Secret> maybeSecret =
-                KubernetesOperationsService.ensureSecretExists(k8sClient, namespace, getVariablesSecretName(name), buildVariablesData(model.getVariables()));
-        if (maybeSecret.isLeft()) {
-            final Throwable cause = maybeSecret.getLeft();
-            final String msg = String.format("Failed to ensure %s input variables secret exists", name);
-            log.error(msg + ": {}", cause.getMessage());
-            log.error(msg, cause);
-            tag = TAG_CONFIG_FAILED;
-        }
-        inputLedger.put(name, tag);
+
+        final Single<ConfigMap> configMapEmitter = ensureConfigMapExists(k8sClient, namespace, getModuleConfigMapName(name), serialisedModuleObject);
+        configMapEmitter.subscribeOn(Schedulers.from(executorService))
+                        .subscribe(
+                                configMap -> log.info("Config map {} for module created for input: {}", configMap.getMetadata().getName(), name),
+                                throwable -> log.error("Failed to create config map for module for input {}: {}", name, throwable.getMessage())
+                        );
+
+        final Single<Secret> secretEmitter = ensureSecretExists(k8sClient, namespace, getVariablesSecretName(name), buildVariablesData(model.getVariables()));
+        secretEmitter.subscribeOn(Schedulers.from(executorService))
+                     .subscribe(
+                             secret -> log.info("Secret {} for variables created for input: {}", secret.getMetadata().getName(), name),
+                             throwable -> log.error("Failed to create secret for variables for input {}: {}", name, throwable.getMessage())
+                     );
+    }
+
+    public void setInputStatus(final String name, final Execution.TF_COMMAND tfCommand) {
+        inputLedger.put(name, tfCommand == Execution.TF_COMMAND.APPLY ? TAG_SEEN : TAG_DESTROYED);
     }
 
     public String getVariablesSecretName(final String name) {
@@ -93,9 +110,5 @@ public class InputService {
 
     private <T> Map<String, String> serializeObject(final T model) throws JsonProcessingException {
         return Map.of("object", mapper.writeValueAsString(model));
-    }
-
-    public void setInputDestroyed(final String name) {
-        inputLedger.put(name, TAG_DESTROYED);
     }
 }

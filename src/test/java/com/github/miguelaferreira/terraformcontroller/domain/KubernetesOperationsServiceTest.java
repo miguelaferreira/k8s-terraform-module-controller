@@ -1,7 +1,6 @@
 package com.github.miguelaferreira.terraformcontroller.domain;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import javax.inject.Inject;
 import java.util.Map;
@@ -11,7 +10,6 @@ import io.micronaut.kubernetes.client.v1.configmaps.ConfigMap;
 import io.micronaut.kubernetes.client.v1.secrets.Secret;
 import io.micronaut.test.annotation.MicronautTest;
 import io.reactivex.Flowable;
-import io.vavr.control.Either;
 import io.vavr.control.Try;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
@@ -32,39 +30,32 @@ class KubernetesOperationsServiceTest {
 
     @Test
     void testEnsureConfigMapExists() {
-        final Either<Throwable, ConfigMap> created = KubernetesOperationsService.ensureConfigMapExists(k8sClient,
-                "default", name, Map.of("key1", "value1"));
+        final ConfigMap created = KubernetesOperationsService.ensureConfigMapExists(k8sClient, "default", name, Map.of("key1", "value1")).blockingGet();
 
-        assertTrue(created.isRight());
-        assertThat(created.get(), Matchers.notNullValue());
-        assertThat(created.get().getData().entrySet(), Matchers.hasSize(1));
-        assertThat(created.get().getData().get("key1"), Matchers.is("value1"));
+        assertThat(created, Matchers.notNullValue());
+        assertThat(created.getData().entrySet(), Matchers.hasSize(1));
+        assertThat(created.getData().get("key1"), Matchers.is("value1"));
 
-        final Either<Throwable, ConfigMap> updated = KubernetesOperationsService.ensureConfigMapExists(k8sClient,
-                "default", name, Map.of("key1", "value1", "key2", "value2"));
+        final ConfigMap updated = KubernetesOperationsService.ensureConfigMapExists(k8sClient, "default", name, Map.of("key1", "value1", "key2", "value2")).blockingGet();
 
-        assertTrue(updated.isRight());
-        assertThat(updated.get(), Matchers.notNullValue());
-        assertThat(created.get().getData().entrySet(), Matchers.hasSize(1));
-        assertThat(updated.get().getData().get("key1"), Matchers.is("value1"));
+        assertThat(updated, Matchers.notNullValue());
+        assertThat(created.getData().entrySet(), Matchers.hasSize(1));
+        assertThat(updated.getData().get("key1"), Matchers.is("value1"));
     }
 
     @Test
     void testEnsureSecretExists() {
-        final Either<Throwable, Secret> created = KubernetesOperationsService.ensureSecretExists(k8sClient,
-                "default", name, Map.of("key1", "value1".getBytes()));
+        final Secret created = KubernetesOperationsService.ensureSecretExists(k8sClient, "default", name, Map.of("key1", "value1".getBytes())).blockingGet();
 
-        assertTrue(created.isRight());
-        assertThat(created.get(), Matchers.notNullValue());
-        assertThat(created.get().getData().entrySet(), Matchers.hasSize(1));
-        assertThat(created.get().getData().get("key1"), Matchers.is("value1".getBytes()));
+        assertThat(created, Matchers.notNullValue());
+        assertThat(created.getData().entrySet(), Matchers.hasSize(1));
+        assertThat(created.getData().get("key1"), Matchers.is("value1".getBytes()));
 
-        final Either<Throwable, Secret> updated = KubernetesOperationsService.ensureSecretExists(k8sClient,
-                "default", name, Map.of("key1", "value1".getBytes(), "key2", "value2".getBytes()));
+        final Secret updated =
+                KubernetesOperationsService.ensureSecretExists(k8sClient, "default", name, Map.of("key1", "value1".getBytes(), "key2", "value2".getBytes())).blockingGet();
 
-        assertTrue(updated.isRight());
-        assertThat(updated.get(), Matchers.notNullValue());
-        assertThat(created.get().getData().entrySet(), Matchers.hasSize(1));
-        assertThat(updated.get().getData().get("key1"), Matchers.is("value1".getBytes()));
+        assertThat(updated, Matchers.notNullValue());
+        assertThat(created.getData().entrySet(), Matchers.hasSize(1));
+        assertThat(updated.getData().get("key1"), Matchers.is("value1".getBytes()));
     }
 }

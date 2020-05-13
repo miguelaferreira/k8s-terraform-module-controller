@@ -3,3 +3,15 @@ micronaut:
     name: k8s-terraform-controller
   config-client:
     enabled: true
+
+kubernetes:
+  client:
+    discovery:
+      enabled: true
+      includes:
+        - kubernetes.default.svc
+    secrets:
+      enabled: false
+    config-maps:
+      labels:
+        - tf.module/config: controller

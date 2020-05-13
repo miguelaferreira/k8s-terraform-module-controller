@@ -2,21 +2,24 @@ package com.github.miguelaferreira.terraformcontroller;
 
 import static com.github.miguelaferreira.terraformcontroller.domain.Execution.ENV_VAR_TF_BACKEND_AWS_ACCESS_KEY_ID;
 import static com.github.miguelaferreira.terraformcontroller.domain.Execution.ENV_VAR_TF_BACKEND_AWS_SECRET_ACCESS_KEY;
+import static com.github.miguelaferreira.terraformcontroller.domain.KubernetesOperationsService.ensureConfigMapExists;
 
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
 
-import com.github.miguelaferreira.terraformcontroller.domain.KubernetesOperationsService;
 import com.github.miguelaferreira.terraformcontroller.domain.ModelConstants;
 import com.github.miguelaferreira.terraformcontroller.utils.FileUtils;
+import com.github.miguelaferreira.terraformcontroller.utils.RxUtils;
 import io.micronaut.kubernetes.client.v1.KubernetesClient;
+import io.micronaut.kubernetes.client.v1.KubernetesConfiguration;
 import io.micronaut.kubernetes.client.v1.configmaps.ConfigMap;
 import io.micronaut.kubernetes.client.v1.secrets.Secret;
-import io.reactivex.Flowable;
-import io.vavr.control.Either;
-import io.vavr.control.Try;
+import io.reactivex.Single;
+import io.reactivex.schedulers.Schedulers;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -28,43 +31,56 @@ import lombok.extern.slf4j.Slf4j;
 public class BackendService {
 
     public static final String CODE_FILE_BACKEND_TF = "backend.tf";
+    public static final String TERRAFORM_BACKEND_CONFIG_MAP_NAME = "backend-tf-config";
 
     private final TerraformBackendConfig config;
     private final String namespace;
     private final KubernetesClient k8sClient;
+    private final ExecutorService executorService;
 
-    public BackendService(final String namespace, final TerraformBackendConfig config, final KubernetesClient k8sClient) {
+    public BackendService(final KubernetesConfiguration k8sConfig, final TerraformBackendConfig config, final KubernetesClient k8sClient,
+                          @Named("io") final ExecutorService executorService) {
         this.config = config;
-        this.namespace = namespace;
+        this.namespace = k8sConfig.getNamespace();
         this.k8sClient = k8sClient;
+        this.executorService = executorService;
     }
 
     public void init() throws IOException {
-        setupBackendConfigMap(namespace, config, k8sClient);
+        setupBackendFileConfigMap(namespace, k8sClient);
         validateBackendSecret(namespace, config, k8sClient);
     }
 
-    private void setupBackendConfigMap(final String namespace, final TerraformBackendConfig config, final KubernetesClient k8sClient) throws IOException {
-        final Either<Throwable, ConfigMap> maybeConfigMap =
-                KubernetesOperationsService.ensureConfigMapExists(k8sClient, namespace, config.getConfigMapName(), Map.of(CODE_FILE_BACKEND_TF, getTerraformBackendCode()));
-        if (maybeConfigMap.isLeft()) {
-            final Throwable cause = maybeConfigMap.getLeft();
-            log.error("Failed to ensure backend configmap exists: {}", cause.getMessage());
-            throw new RuntimeException("Failed to ensure backend configmap exists", cause);
-        }
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    private void setupBackendFileConfigMap(final String namespace, final KubernetesClient k8sClient) throws IOException {
+        final Single<ConfigMap> maybeConfigMap =
+                ensureConfigMapExists(k8sClient, namespace, TERRAFORM_BACKEND_CONFIG_MAP_NAME, Map.of(CODE_FILE_BACKEND_TF, getTerraformBackendCode()));
+
+        maybeConfigMap.subscribeOn(Schedulers.from(executorService))
+                      .subscribe(
+                              configMap -> log.info("Backend config map exists: {}", configMap.getMetadata().getName()),
+                              throwable -> log.error("Failed to ensure backend configmap exists: {}", throwable.getMessage())
+                      );
     }
 
+    @SuppressWarnings("ResultOfMethodCallIgnored")
     private void validateBackendSecret(final String namespace, final TerraformBackendConfig config, final KubernetesClient k8sClient) {
         final String credentialsSecretName = config.getS3().getCredentialsSecretName();
-        Try.of(() -> Flowable.fromPublisher(k8sClient.getSecret(namespace, credentialsSecretName)).blockingFirst())
-           .onSuccess(secret -> {
-               log.info("Found configured credentials secret for terraform backend: {}", credentialsSecretName);
-               validateCredentialEnvVars(secret);
-           }).onFailure(throwable -> log.warn("Could not find configured credentials secret for terraform backend: {}", credentialsSecretName));
+
+        RxUtils.oneShot(k8sClient.getSecret(namespace, credentialsSecretName))
+               .subscribeOn(Schedulers.from(executorService))
+               .subscribe(secret -> {
+                   log.info("Found configured credentials secret for terraform backend: {}", credentialsSecretName);
+                   validateCredentialEnvVars(secret);
+               }, throwable -> {
+                   final String msg = String.format("Could not find configured credentials secret for terraform backend: %s", credentialsSecretName);
+                   log.warn(msg);
+                   log.debug(msg, throwable);
+               });
     }
 
     public String getConfigMapName() {
-        return config.getConfigMapName();
+        return TERRAFORM_BACKEND_CONFIG_MAP_NAME;
     }
 
     public String getCredentialsSecretName() {
@@ -85,6 +101,8 @@ public class BackendService {
     }
 
     private String getTerraformBackendCode() throws IOException {
-        return FileUtils.readResourceContent(ModelConstants.TERRAFORM_BACKEND_FILE, ModelConstants.getConfigReplacement(config.getS3()));
+        final TerraformBackendConfig.S3 s3Config = config.getS3();
+        log.info("Configuring terraform backend with: {}", s3Config);
+        return FileUtils.readResourceContent(ModelConstants.TERRAFORM_BACKEND_FILE, ModelConstants.getConfigReplacement(s3Config));
     }
 }

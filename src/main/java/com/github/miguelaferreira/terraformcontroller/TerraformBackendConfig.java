@@ -8,18 +8,15 @@ import lombok.Data;
 public class TerraformBackendConfig {
 
     private String configMapName = "terraform-backend-config";
-    private S3 s3;
+    private S3 s3 = new S3();
 
     @Data
     @ConfigurationProperties("s3")
     public static class S3 {
-        private String region = "eu-west-1";
+        private String region = "some-region";
         private boolean encrypt = true;
-        private String bucket;
-        private String dynamoDbTable;
-        private String credentialsSecretName;
-        // Todo: remove 👇
-        private String awsAccessKeyId;
-        private String awsSecretAccessKey;
+        private String bucket = "some-bucket";
+        private String dynamoDbTable = "some-table";
+        private String credentialsSecretName = "some-credentials-secret-names";
     }
 }

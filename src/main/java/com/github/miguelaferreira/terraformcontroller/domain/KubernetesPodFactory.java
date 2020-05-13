@@ -24,24 +24,24 @@ public class KubernetesPodFactory {
     public static final String MODULE_SHARE_VOLUME_NAME = "module-share-volume";
     public static final String TERRAFORM_BACKEND_CONFIG_VOLUME_NAME = "backend-config-volume";
 
-    public static Pod build(final Execution model) {
+    public static Pod build(final Execution model, final Execution.TF_COMMAND tfCommand) {
         if (model instanceof ExecutionPodModel) {
-            return build((ExecutionPodModel) model);
+            return build((ExecutionPodModel) model, tfCommand);
         } else {
             throw new RuntimeException("Only supported execution model is ExecutionPodModel");
         }
     }
 
-    private static Pod build(final ExecutionPodModel model) {
+    private static Pod build(final ExecutionPodModel model, final Execution.TF_COMMAND tfCommand) {
         final Pod pod = new Pod();
-        pod.setMetadata(buildMeta(model));
+        pod.setMetadata(buildMeta(model, tfCommand));
         pod.setSpec(buildSpec(model));
         return pod;
     }
 
-    private static Metadata buildMeta(final ExecutionPodModel model) {
+    private static Metadata buildMeta(final ExecutionPodModel model, final Execution.TF_COMMAND tfCommand) {
         final Metadata meta = new Metadata();
-        meta.setName(model.getName() + "-" + UUID.randomUUID());
+        meta.setName(model.getName() + "-" + tfCommand.toString().toLowerCase() + "-" + UUID.randomUUID());
         if (model.hasAppLabel()) {
             meta.setLabels(Map.of(LABEL_APP, model.getAppLabel()));
         }

@@ -1,0 +1,9 @@
+micronaut:
+  application:
+    name: k8s-terraform-module-controller
+
+kubernetes:
+  client:
+    host: localhost
+    port: 8001
+    secure: false

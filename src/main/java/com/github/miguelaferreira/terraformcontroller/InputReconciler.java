@@ -2,8 +2,11 @@ package com.github.miguelaferreira.terraformcontroller;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
+import javax.validation.constraints.NotNull;
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.github.miguelaferreira.terraformcontroller.domain.Execution;
@@ -13,8 +16,9 @@ import com.github.miguelaferreira.terraformcontroller.domain.InputSource;
 import io.micronaut.kubernetes.client.v1.pods.Pod;
 import io.micronaut.kubernetes.client.v1.secrets.Secret;
 import io.micronaut.kubernetes.client.v1.secrets.SecretWatchEvent;
+import io.reactivex.Single;
+import io.reactivex.schedulers.Schedulers;
 import io.vavr.control.Either;
-import io.vavr.control.Try;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -25,24 +29,27 @@ public class InputReconciler implements Reconciler {
     private final InputService inputService;
     private final ExecutionService executionService;
     private final RegCredService regCredService;
+    private final ExecutorService executorService;
 
     @Inject
-    public InputReconciler(final BackendService backendService, final InputService inputService, final ExecutionService executionService, final RegCredService
-            regCredService) {
+    public InputReconciler(final BackendService backendService, final InputService inputService, final ExecutionService executionService,
+                           final RegCredService regCredService, @Named("io") final ExecutorService executorService) {
         this.backendService = backendService;
         this.inputService = inputService;
         this.executionService = executionService;
         this.regCredService = regCredService;
+        this.executorService = executorService;
     }
 
     @PostConstruct
     public void init() throws IOException {
+        log.info("Initializing input reconciler");
         backendService.init();
     }
 
     @Override
     public void handleSecretWatch(final SecretWatchEvent event) {
-        log.info("Reconciling input event: {}", event);
+        log.info("Reconciling module event: {}", event);
 
         switch (event.getType()) {
             case ADDED:
@@ -58,96 +65,87 @@ public class InputReconciler implements Reconciler {
             default:
                 log.error("Unexpected event: {}", event);
         }
+
+        log.info("Module event reconciled: {}", event);
     }
 
     private void destroyModule(final SecretWatchEvent event) {
         final Secret secret = event.getObject();
         final String inputName = secret.getMetadata().getName();
 
-        log.info("Destroying module for: {}", inputName);
+        log.info("Destroying module: {}", inputName);
 
         if (!inputService.hasInputBeenSeen(inputName)) {
-            log.debug("Input {} has NOT been seen", inputName);
+            log.debug("Module {} has NOT been seen", inputName);
             return;
         }
 
-        log.debug("Input {} has been seen", inputName);
+        log.debug("Module {} has been seen", inputName);
 
-        processInput(TF_COMMAND.DESTROY, secret, inputName);
-
-        inputService.setInputDestroyed(inputName);
+        createExecutionResources(secret, inputName, TF_COMMAND.DESTROY);
     }
 
+    @NotNull
     private void provisionModule(final SecretWatchEvent event) {
         final Secret secret = event.getObject();
         final String inputName = secret.getMetadata().getName();
-        log.info("Provisioning module for: {}", inputName);
+        log.info("Provisioning module: {}", inputName);
 
         if (inputService.hasInputBeenSeen(inputName)) {
-            log.debug("Input {} has been seen", inputName);
+            log.debug("Module {} has been seen", inputName);
             return;
         }
 
-        log.debug("Input {} has NOT been seen", inputName);
+        log.debug("Module {} has NOT been seen", inputName);
 
-        processInput(TF_COMMAND.APPLY, secret, inputName);
+        createExecutionResources(secret, inputName, TF_COMMAND.APPLY);
     }
 
+    private void createExecutionResources(final Secret secret, final String inputName, final TF_COMMAND destroy) {
+        processInput(destroy, secret, inputName);
+    }
+
+    @SuppressWarnings("ResultOfMethodCallIgnored")
     private void processInput(final TF_COMMAND tfCommand, final Secret secret, final String inputName) {
-        final InputSource inputSource = parseInputSecret(inputName, secret);
-        final Input inputResource = Input.fromDefaultSource(inputSource);
-        registerInput(inputName, inputResource);
-        try {
-            final Execution executionPodModel = Execution.defaultExecution(
-                    tfCommand,
-                    inputName,
-                    inputResource,
-                    backendService.getCredentialsSecretName(),
-                    backendService.getConfigMapName(),
-                    inputService.getVariablesSecretName(inputName),
-                    regCredService.getSecrets());
-
-            final Either<Throwable, Pod> maybePod = executePodForInput(inputName, executionPodModel);
-            if (maybePod.isLeft()) {
-                log.error("Reconcile request failed: {}", maybePod.getLeft().getMessage());
-            } else {
-                log.info("Reconcile request served: {}", maybePod.get().getMetadata().getName());
-            }
-        } catch (final Throwable t) {
-            log.error("Reconciler exception: " + t.getMessage(), t);
+        final Either<Throwable, InputSource> inputSourceOrError = parseInputSecret(secret);
+        if (inputSourceOrError.isLeft()) {
+            log.error("Failed to process input with an error parsing the input secret: " + inputName, inputSourceOrError.getLeft());
+            return;
         }
-    }
 
-    public Either<Throwable, Pod> executePodForInput(final String inputName, final Execution executionPodModel) {
-        return Try.of(() -> executionService.executeInput(executionPodModel))
-                  .onFailure(throwable -> {
-                      final String message = String.format("Failed to execute pod for input %s", inputName);
-                      log.error("{}: {}", message, throwable.getMessage());
-                      log.debug(message, throwable);
-                  }).toEither();
+        final Input inputResource = Input.fromDefaultSource(inputSourceOrError.get());
+        registerInput(inputName, inputResource);
+
+        final Execution executionPodModel = Execution.defaultExecution(
+                tfCommand,
+                inputName,
+                inputResource,
+                backendService.getCredentialsSecretName(),
+                backendService.getConfigMapName(),
+                inputService.getVariablesSecretName(inputName),
+                regCredService.getSecrets());
+
+        final Single<Pod> podEmitter = executionService.createExecutionPod(tfCommand, executionPodModel);
+        podEmitter.subscribeOn(Schedulers.from(executorService))
+                  .subscribe(
+                          pod -> {
+                              log.info("Created pod to {} module {}: {}", tfCommand == TF_COMMAND.APPLY ? "provision" : "destroy", inputName, pod.getMetadata().getName());
+                              inputService.setInputStatus(inputName, tfCommand);
+                          },
+                          throwable -> log.error("Failed to create pod to execute module " + inputName + ": {}", throwable.getMessage())
+                  );
     }
 
     public void registerInput(final String inputName, final Input inputResource) {
-        try {
-            inputService.configureInput(inputName, inputResource);
-        } catch (final JsonProcessingException e) {
-            final String message = String.format("Failed to register input %s", inputName);
-            log.error("{}: {}", message, e.getMessage());
-            log.debug(message, e);
-            throw new RuntimeException(message, e); // controller typically swallows these so we log them first
-        }
+        log.debug("Registering input: {}", inputName);
+        inputService.configureInput(inputName, inputResource);
     }
 
-    public InputSource parseInputSecret(final String inputName, final Secret secret) {
-        final InputSource inputSource;
+    public Either<Throwable, InputSource> parseInputSecret(final Secret secret) {
         try {
-            inputSource = SecretInputSource.of(secret);
+            return Either.right(SecretInputSource.of(secret));
         } catch (final JsonProcessingException e) {
-            final String message = String.format("Failed to parse input secret %s", inputName);
-            log.error("{}: {}", message, e.getMessage());
-            log.debug(message, e);
-            throw new RuntimeException(message, e); // controller typically swallows these so we log them first
+            return Either.left(e);
         }
-        return inputSource;
     }
 }
