@@ -72,7 +72,6 @@ jib {
     to {
         image = 'docker.pkg.github.com/miguelaferreira/k8s-terraform-module-controller/controller-java11'
         tags = ["latest", version]
-        credHelper = 'osxkeychain'
     }
     container {
         jvmFlags = ["-XshowSettings: vm", "-XX:+UseContainerSupport"]
@@ -92,6 +91,3 @@ tasks.withType(JavaCompile) {
     options.encoding = "UTF-8"
     options.compilerArgs.add('-parameters')
 }
-
-compileJava.options.fork = true
-compileJava.options.forkOptions.executable = '/Users/miguel/.sdkman/candidates/java/current/bin/javac'
