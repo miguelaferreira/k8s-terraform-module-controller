@@ -25,16 +25,31 @@ Users of the controller can bind other pods to the contents of the output secret
 
 To use the controller it needs to be installed and configured. Section [Installation](#installation) describes steps to create a terraform backend on AWS, and to install the controller on a k8s cluster.
 
+### Building the controller
+
+The build of the controller docker container can be done directly with gradle.
+```bash
+./gradlew clean build jib -x test
+```
+The flag `-x test` disabled the execution of tests during the build.
+Tests included in the controller project require a proxy connection to a kubernetes cluster.
+To execute the tests remove the `-x test` flag and open a proxy redirection to a cluster via kubectl.
+```bash
+kubect proxy &
+./gradlew clean build jib
+```
 
 ### Installation and configuration
 
 The controller needs a TF backend to store the states of the provisioned resources.
 The required configuration and credentials have to be specified in the application configuration (ie. application.yaml).
 The only type of backend currently supported is S3 (S3 bucket + DynamoDB table + KMS key?).
+To access the TF backend the controller needs to have permissions over the backend resources.
+Permissions can be provided via a secret with AWS keys in the required format.
+
 Here's a snippet of the controller configuration to define a terraform backend.
 ```yaml
 terraform_backend:
-  configmap_name: "terraform-backend-config"
   s3:
     bucket: "k8s-terraform-controller"
     dynamo_db_table: "k8s-terraform-controller"
@@ -47,7 +62,11 @@ kubectl create secret generic terraform-backend-credentials \
     --from-literal=TF_BACKEND_AWS_ACCESS_KEY_ID='zzzzzzzzzzzzzzzzzzzz' \
     --from-literal=TF_BACKEND_AWS_SECRET_ACCESS_KEY='xxxxxxxxxxxxxxxxxxxxxxxxx'
 ```
-Note that the content of the secret ☝️ will be injected in the environment of the container that provisions resources, so it needs to conform to the AWS SDK defaults.
+Note that the content of the secret ☝️ will be injected in the environment of the container that provisions resources, so it needs to conform to the format expected by the controller.
+Currently the controller configures the credentials for the backend using two environment variables:
+* `TF_BACKEND_AWS_ACCESS_KEY_ID`
+* `TF_BACKEND_AWS_SECRET_ACCESS_KEY`
+
 
 #### Create the Terraform Backend
 
@@ -61,8 +80,6 @@ terraform apply -auto-approve
 ```
 That module also offers the possibility to configure AWS IAM users and roles with access to the backend, but that requires adapting the code and adding the respective ARNs.
 
-
-
 #### Install the controller on a cluster
 
 ...
@@ -73,7 +90,7 @@ That module also offers the possibility to configure AWS IAM users and roles wit
 ```bash
 kubectl create secret generic infra-resource-test-1 \
     --from-literal=name='test-s3-bucket' \
-    --from-literal=image='docker.pkg.github.com/miguelaferreira/k8s-terraform-controller/terraform-modules' \
+    --from-literal=image='docker.pkg.github.com/miguelaferreira/k8s-terraform-module-controller/terraform-modules' \
     --from-literal=tag=dev \
     --from-literal=path='/modules/aws/s3-bucket' \
     --from-literal=variables='

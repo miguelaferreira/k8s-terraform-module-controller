@@ -1,0 +1,125 @@
+{{/* # @formatter:off */}}
+
+{{ if .Values.rbac.create }}
+
+---
+
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: resource-watcher
+  labels:
+    {{- include "k8s-terraform-module-controller.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "watch", "list"]
+
+---
+
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: sa-resource-watcher
+  labels:
+    {{- include "k8s-terraform-module-controller.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "k8s-terraform-module-controller.serviceAccountName" . }}
+roleRef:
+  kind: Role
+  name: resource-watcher
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: pod-creator
+  labels:
+    {{- include "k8s-terraform-module-controller.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "watch", "list", "create"]
+
+---
+
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: sa-pod-creator
+  labels:
+    {{- include "k8s-terraform-module-controller.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "k8s-terraform-module-controller.serviceAccountName" . }}
+roleRef:
+  kind: Role
+  name: pod-creator
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: configmap-creator
+  labels:
+    {{- include "k8s-terraform-module-controller.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "watch", "list", "update", "create", "patch", "delete"]
+
+---
+
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: sa-configmap-creator
+  labels:
+    {{- include "k8s-terraform-module-controller.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "k8s-terraform-module-controller.serviceAccountName" . }}
+roleRef:
+  kind: Role
+  name: configmap-creator
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: secret-creator
+  labels:
+    {{- include "k8s-terraform-module-controller.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "watch", "list", "update", "create", "patch", "delete"]
+
+---
+
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: sa-secret-creator
+  labels:
+    {{- include "k8s-terraform-module-controller.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "k8s-terraform-module-controller.serviceAccountName" . }}
+roleRef:
+  kind: Role
+  name: secret-creator
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+{{ end }}
+
+{{/* # @formatter:on */}}

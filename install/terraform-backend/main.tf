@@ -7,8 +7,7 @@ variable "aws_region" {
   default = "eu-west-1"
 }
 
-variable "bucket_name" {
-}
+variable "bucket_name" {}
 
 module "state_backend" {
   source = "git::https://gitlab.com/open-source-devex/terraform-modules/aws/terraform-state-backend?ref=v1.0.9"
@@ -43,4 +42,8 @@ module "state_backend" {
 
 output "s3_bucket" {
   value = module.state_backend.s3_bucket_id
+}
+
+output "dynamodb_table" {
+  value = module.state_backend.s3_bucket_lock_table_name
 }

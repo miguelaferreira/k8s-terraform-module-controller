@@ -1,0 +1,17 @@
+Controller is installed and will be listening for inputs.
+The controller requires at least one secret to be created with credentials for its terraform backend in AWS.
+
+To create the secret for the terraform backend credentials do:
+
+    kubectl create secret generic -n {{ .Release.Namespace }} {{ .Values.controller.terraformBackend.s3.sceretName}} \
+        --from-literal=TF_BACKEND_AWS_ACCESS_KEY_ID='zzzzzzzzzzzzzzzzzzzz' \
+        --from-literal=TF_BACKEND_AWS_SECRET_ACCESS_KEY='xxxxxxxxxxxxxxxxxxxxxxxxx'
+
+Depending on the container images used for the terraform modules the controller might need to container registry credentials secrets.
+{{- if .Values.imagePullSecrets }}
+Make sure the secrets specified in imagePullSecrets exist:
+{{- range .Values.imagePullSecrets }}
+  - {{ . | quote }}
+{{- end }}
+{{- end }}
+

@@ -1,0 +1,26 @@
+{{/* # @formatter:off */}}
+
+---
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ include "k8s-terraform-module-controller.appliction.configmapName" . }}
+  labels:
+    tf.module/config: controller
+    {{- include "k8s-terraform-module-controller.labels" . | nindent 4 }}
+data:
+  application.properties: |
+    controller.input_label_selector=tf.module/input
+    {{- if .Values.imagePullSecrets }}
+    controller.container_registry_cred_secrets={{ join "," .Values.imagePullSecrets }}
+    {{- end }}
+    terraform_backend.s3.region={{ .Values.controller.terraformBackend.s3.region }}
+    terraform_backend.s3.bucket={{ .Values.controller.terraformBackend.s3.bucket }}
+    terraform_backend.s3.dynamo_db_table={{ .Values.controller.terraformBackend.s3.dynamodbTable }}
+    terraform_backend.s3.encrypt={{ .Values.controller.terraformBackend.s3.encrypt }}
+    terraform_backend.s3.credentials_secretName={{ .Values.controller.terraformBackend.s3.sceretName }}
+
+---
+
+{{/* # @formatter:on */}}
