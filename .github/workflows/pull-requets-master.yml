@@ -29,7 +29,7 @@ jobs:
         uses: eskatos/gradle-command-action@v1
         with:
           gradle-version: 6.3
-          arguments: wrapper clean assemble
+          arguments: clean assemble
       - name: Package
         uses: eskatos/gradle-command-action@v1
         with:
