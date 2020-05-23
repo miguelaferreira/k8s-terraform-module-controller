@@ -39,7 +39,7 @@ jobs:
         uses: eskatos/gradle-command-action@v1
         with:
           gradle-version: 6.3
-          arguments: reckonTagPush -Preckon.stage=rc
+          arguments: reckonTagPush -Preckon.stage=rc -x test # tests require kubectl proxy to work
         env:
           GRGIT_USER: miguelaferreira
           GRGIT_PASS: ${{ secrets.GITHUB_TOKEN }}
