@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
-set -euov pipefail
+set -euo pipefail
 IFS=$'\n\t'
 
 usage() {
     echo "==# Expected docker image tag as 1st arg"
     exit 1
 }
+
+set -v
 
 git fetch origin master
 short_sha=$(  git rev-parse --short HEAD )
@@ -24,5 +26,7 @@ for container in $( ls docker ); do
         eval "docker build -t ${docker_image_full_path} ."
         docker push ${docker_image_full_path}
         cd -
+     else
+        echo "==> Skipping container ${container}"
     fi
 done
