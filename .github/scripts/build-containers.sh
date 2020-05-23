@@ -11,7 +11,7 @@ usage() {
 set -v
 
 git fetch origin master
-short_sha=$(  git rev-parse --short HEAD )
+short_sha=$( git rev-parse --short HEAD )
 docker_image_tag=${1-${short_sha}}
 
 [[ -z "${docker_image_tag}" ]] && usage
