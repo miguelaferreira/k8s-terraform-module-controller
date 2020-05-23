@@ -44,20 +44,13 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - name: Build images
         shell: bash
         env:
           DOCKER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          for container_directory in ls docker; do
-            if [[ -d "${container_directory}" ]] && ! git diff --quiet $( git merge-base origin/master HEAD ) HEAD -- ${container_directory}; then
-              cd ${container_directory}
-              DOCKER_IMAGE_TAG=$(cat VERSION)-$(git rev-parse --short HEAD)
-              DOCKER_IMAGE_FULL_PATH=$(echo docker.pkg.github.com/${GITHUB_REPOSITORY}/${container_directory}:${DOCKER_IMAGE_TAG} | tr '[:upper:]' '[:lower:]')
-              docker login -u publisher -p ${DOCKER_TOKEN} docker.pkg.github.com
-              eval "docker build ${BUILD_ARGS} -t ${DOCKER_IMAGE_FULL_PATH} ."
-              docker push ${DOCKER_IMAGE_FULL_PATH}
-              cd ..
-            fi
-          done
+          container_tag="${GITHUB_REF/refs\/pull\//pr-}"
+          .github/scripts/build-containers.sh "${container_tag/\/merge/}-$( git rev-parse --short HEAD )"
