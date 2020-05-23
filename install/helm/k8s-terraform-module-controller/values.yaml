@@ -1,0 +1,60 @@
+# Default values for k8s-terraform-module-controller.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+controller:
+  # Configure the terraform backend the controller will use to store the states of the provisioned modules
+  terraformBackend:
+    s3:
+      region: "eu-west-1"
+      bucket: "terraform-backend-s3-bucket"
+      dynamodbTable: "terraform-backend-dynamodb-table"
+      # Whether to use KMS encryption
+      encrypt: true
+      # Credentials secret name
+      sceretName: "terraform-backend-credentials"
+
+image:
+  repository: docker.pkg.github.com/miguelaferreira/k8s-terraform-module-controller/controller-java11
+  pullPolicy: Always
+
+# list of secret names
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+rbac:
+  create: true
+  serviceAccount:
+    create: true
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name:
+    # Annotations to add to the service account
+    annotations: {}
+
+podSecurityContext: {}
+# fsGroup: 2000
+
+securityContext: {}
+# capabilities:
+#   drop:
+#   - ALL
+# readOnlyRootFilesystem: true
+# runAsNonRoot: true
+# runAsUser: 1000
+
+resources: {}
+#resources:
+#  limits:
+#    cpu: 500m
+#    memory: 512Mi
+#  requests:
+#    cpu: 500m
+#    memory: 512Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

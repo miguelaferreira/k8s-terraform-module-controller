@@ -1,0 +1,40 @@
+{{/* # @formatter:off */}}
+
+{{ if .Values.rbac.create }}
+
+---
+
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: output-secret-creator
+  labels:
+    {{- include "k8s-terraform-module-controller.labels" . | nindent 4 }}
+    tf.module/config: pod-execution
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "update", "create", "patch", "delete"]
+
+---
+
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: default-output-secret-creator
+  labels:
+    {{- include "k8s-terraform-module-controller.labels" . | nindent 4 }}
+    tf.module/config: pod-execution
+subjects:
+  - kind: ServiceAccount
+    name: default {{/* outputs are created via kubectl that runs as default */}}
+roleRef:
+  kind: Role
+  name: output-secret-creator
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+{{ end }}
+
+{{/* # @formatter:on */}}

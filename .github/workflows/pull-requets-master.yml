@@ -1,0 +1,63 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
+on:
+  pull_request:
+    branches: [ master ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build_java:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Docker login GitHub Packages (GITHUB_TOKEN)
+        shell: bash
+        env:
+          DOCKER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run:  docker login https://docker.pkg.github.com -u publisher --password ${DOCKER_TOKEN}
+      - uses: actions/checkout@v2
+      - uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Build
+        uses: eskatos/gradle-command-action@v1
+        with:
+          gradle-version: 6.3
+          arguments: clean assemble
+      - name: Package and push container
+        uses: eskatos/gradle-command-action@v1
+        with:
+          gradle-version: 6.3
+          arguments: jib -x test # tests require kubectl proxy to work
+
+  build_modules_container:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+      - name: Build images
+        shell: bash
+        env:
+          DOCKER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          for container_directory in ls docker; do
+            if [[ -d "${container_directory}" ]] && ! git diff --quiet $( git merge-base origin/master HEAD ) HEAD -- ${container_directory}; then
+              cd ${container_directory}
+              DOCKER_IMAGE_TAG=$(cat VERSION)-$(git rev-parse --short HEAD)
+              DOCKER_IMAGE_FULL_PATH=$(echo docker.pkg.github.com/${GITHUB_REPOSITORY}/${container_directory}:${DOCKER_IMAGE_TAG} | tr '[:upper:]' '[:lower:]')
+              docker login -u publisher -p ${DOCKER_TOKEN} docker.pkg.github.com
+              eval "docker build ${BUILD_ARGS} -t ${DOCKER_IMAGE_FULL_PATH} ."
+              docker push ${DOCKER_IMAGE_FULL_PATH}
+              cd ..
+            fi
+          done

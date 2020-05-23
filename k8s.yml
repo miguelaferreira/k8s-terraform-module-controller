@@ -1,0 +1,36 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "k8s-terraform-controller"
+spec:
+  selector:
+    matchLabels:
+      app: "k8s-terraform-controller"
+  template:
+    metadata:
+      labels:
+        app: "k8s-terraform-controller"
+    spec:
+      imagePullSecrets:
+        - name: regcred-github
+      containers:
+        - name: "k8s-terraform-controller"
+          image: "docker.pkg.github.com/miguelaferreira/k8s-terraform-module-controller/controller-java11:0.1.0"
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
