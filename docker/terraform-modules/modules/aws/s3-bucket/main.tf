@@ -25,7 +25,6 @@ module "s3_bucket" {
 
   lifecycle_rule = var.lifecycle_rule
 
-
   server_side_encryption_configuration = var.server_side_encryption_configuration
 
   // S3 bucket-level Public Access Block configuration
