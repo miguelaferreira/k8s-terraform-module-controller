@@ -3,9 +3,16 @@ plugins {
     id "com.github.johnrengelman.shadow" version "5.2.0"
     id "application"
     id "net.ltgt.apt-eclipse" version "0.21"
+    id 'org.ajoberstar.reckon' version '0.12.0'
 }
 
-version new File('VERSION').text.trim()
+reckon {
+    scopeFromProp()
+    stageFromProp('rc', 'final')
+}
+
+reckonTagCreate.dependsOn check
+
 group "com.github.miguelaferreira.terraformcontroller"
 
 repositories {
@@ -71,7 +78,7 @@ jib {
     }
     to {
         image = 'docker.pkg.github.com/miguelaferreira/k8s-terraform-module-controller/controller-java11'
-        tags = ["latest", version]
+        tags = ["latest", version.toString().replaceAll("[+]", "_")]
     }
     container {
         jvmFlags = ["-XshowSettings: vm", "-XX:+UseContainerSupport"]
