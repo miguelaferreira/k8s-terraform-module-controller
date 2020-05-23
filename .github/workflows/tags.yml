@@ -23,4 +23,4 @@ jobs:
         env:
           DOCKER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: .github/scripts/build-containers.sh "${GITHUB_REF}"
+        run: .github/scripts/build-containers.sh "${GITHUB_REF/refs\/tags\//}"
