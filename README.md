@@ -62,6 +62,7 @@ kubectl create ns terraform-controller
 The controller needs a terraform backend where to store and keep track of the states for the provisioned modules.
 Terraform supports several types of backends, however this controller only supports a S3 Bucket backend (S3 + DynamoDB + KMS).
 Before installing the controller, create an S3 terraform backend. The controller does not require a dedicated backend, so if you already have a S3 backend in place you can re-use it.
+For a complete reference of this type of backend see the official [terraform docs on S3 backend](https://www.terraform.io/docs/backends/types/s3.html).
 
 To ease the creation of the backend, this repo includes a terraform module that does just that under [install/terraform-backend](install/terraform-backend/).
 The module requires AWS credentials on the environment and a name for the S3 bucket.
