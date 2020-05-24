@@ -1,3 +1,5 @@
+![CI](https://github.com/miguelaferreira/k8s-terraform-module-controller/workflows/CI/badge.svg)
+
 # k8s-terraform-controller
 
 K8s controller to execute terraform modules.

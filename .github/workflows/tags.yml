@@ -3,7 +3,7 @@
 name: TAG
 
 on:
-  create:
+  push:
     tags:
       - '**'  # all tags
 
@@ -22,4 +22,4 @@ jobs:
         env:
           DOCKER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: .github/scripts/build-containers.sh "${GITHUB_REF/refs\/tags\//}"
+        run: .github/scripts/build-containers.sh "${GITHUB_REF#refs/tags/}"
