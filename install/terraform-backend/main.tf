@@ -23,6 +23,8 @@ module "state_backend" {
     project = "k8s-terraform-controller"
   }
 
+  force_destroy = true
+
   block_public_acls       = true
   ignore_public_acls      = true
   block_public_policy     = true
