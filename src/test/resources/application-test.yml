@@ -7,3 +7,14 @@ kubernetes:
     host: localhost
     port: 8001
     secure: false
+
+controller:
+  container_registry_cred_secrets:
+    - regcred-github
+
+terraform_backend:
+  s3:
+    region: eu-west-1
+    bucket: functurful-k8s-terraform-module-controller-backend
+    dynamo_db_table: functurful-k8s-terraform-module-controller-backend
+    credentials_secret_name: terraform-backend-credentials
