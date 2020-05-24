@@ -2,11 +2,10 @@
 
 name: CI
 
-# Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
 on:
   push:
-    branches: [ master ]
+    branches:
+      - master
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -48,5 +47,5 @@ jobs:
           gradle-version: 6.3
           arguments: reckonTagPush -Preckon.stage=rc -x test # tests require kubectl proxy to work
         env:
-          GRGIT_USER: miguelaferreira
-          GRGIT_PASS: ${{ secrets.GITHUB_TOKEN }}
+          GRGIT_USER: ${GITHUB_ACTOR}
+          GRGIT_PASS: ${{ secrets.REPO_CI_TOKEN }}
